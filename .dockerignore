@@ -1,0 +1,27 @@
+# Keep the build context small and free of local runtime state.
+.git
+.gitignore
+.venv
+venv
+env
+__pycache__
+**/__pycache__
+*.py[cod]
+
+node_modules
+
+# Local database + artifacts (recreated inside the container)
+app/history.db
+test-results
+playwright-report
+blob-report
+.playwright
+
+# The source archive and docs are not needed inside the image
+playwright-practice-studio.zip
+*.zip
+*.md
+
+.DS_Store
+.idea
+.vscode

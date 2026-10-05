@@ -19,10 +19,20 @@ from . import runner
 
 app = FastAPI(title="Playwright Practice Studio API")
 
+# CORS is only needed for cross-origin development - the Studio itself uses
+# same-origin relative URLs. On a public deployment set STUDIO_ALLOWED_ORIGINS
+# to your exact origin(s) instead of leaving it wide open:
+#   STUDIO_ALLOWED_ORIGINS="https://studio.example.com,https://www.example.com"
+_allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("STUDIO_ALLOWED_ORIGINS", "*").split(",")
+    if origin.strip()
+] or ["*"]
+
 # Enable CORS for local cross-origin development if needed
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

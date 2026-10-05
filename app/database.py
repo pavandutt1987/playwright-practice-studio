@@ -4,7 +4,13 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
-DB_FILE = os.path.join(os.path.dirname(__file__), "history.db")
+# Overridable so containers can keep the database on a mounted volume, e.g.
+# STUDIO_DB_PATH=/data/history.db  (see DEPLOYMENT.md)
+DB_FILE = os.environ.get("STUDIO_DB_PATH") or os.path.join(os.path.dirname(__file__), "history.db")
+
+_db_dir = os.path.dirname(os.path.abspath(DB_FILE))
+if _db_dir:
+    os.makedirs(_db_dir, exist_ok=True)
 
 def get_db():
     conn = sqlite3.connect(DB_FILE)

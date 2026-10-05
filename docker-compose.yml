@@ -1,0 +1,23 @@
+# Local container run:  docker compose up --build
+# Then open http://localhost:8000/login
+services:
+  studio:
+    build: .
+    image: playwright-practice-studio
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      # Keep history/snippets on a volume instead of inside the container layer
+      STUDIO_DB_PATH: /data/history.db
+      # Tighten this to your real domain before exposing the app publicly
+      STUDIO_ALLOWED_ORIGINS: "*"
+    volumes:
+      - studio-data:/data
+    # Chromium is much happier with a bigger /dev/shm than Docker's 64 MB default
+    shm_size: "1gb"
+    init: true
+    restart: unless-stopped
+
+volumes:
+  studio-data:

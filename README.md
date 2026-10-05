@@ -4,6 +4,22 @@ A complete local browser-based practice & automation platform for **Python**, **
 
 ---
 
+## 🌐 Deploying it on the web
+
+The Studio executes the code you type, so it needs two things a static host can't give it:
+a long-lived process and a WebSocket. A `Dockerfile`, `docker-compose.yml` and
+`start_web.sh` are included and work on Render, Railway, Fly.io, Google Cloud Run,
+Hugging Face Spaces or any VPS.
+
+```bash
+docker compose up --build      # then open http://localhost:8000/login
+```
+
+**Read [DEPLOYMENT.md](DEPLOYMENT.md) first** — it explains the security implications of
+publishing a code runner, how to gate it, and the per-host steps.
+
+---
+
 ## 🚀 Quick Start (Windows)
 
 ### Step 1: 1-Click Setup (First time only)
