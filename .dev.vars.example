@@ -1,0 +1,8 @@
+# Copy to .dev.vars for `npm run dev` (npx wrangler dev).
+# .dev.vars is gitignored — never commit real secrets.
+#
+# Leave STUDIO_ACCESS_PASSWORD empty while developing locally to disable the
+# gate; set it before deploying anything reachable from the internet.
+STUDIO_ACCESS_PASSWORD=""
+# Optional: require a specific username as well (any username is accepted if unset)
+#STUDIO_ACCESS_USER="studio"

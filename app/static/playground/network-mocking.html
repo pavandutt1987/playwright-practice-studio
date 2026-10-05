@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground - Network Mocking & API Interception</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --border: #334155;
+            --success: #22c55e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 40px 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 650px; }
+        .badge { display: inline-block; background: rgba(56, 189, 248, 0.1); color: var(--primary); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; margin-bottom: 12px; }
+        h1 { font-size: 24px; margin-bottom: 6px; }
+        p.subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 28px; }
+        .btn {
+            background: var(--primary); color: #0f172a; font-weight: 600; padding: 12px 20px; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: opacity 0.2s; width: 100%; margin-bottom: 20px;
+        }
+        .btn:hover { opacity: 0.9; }
+        .profile-card {
+            background: #0b1120; border: 1px solid var(--border); border-radius: 8px; padding: 20px;
+        }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .row:last-child { border-bottom: none; }
+        .label { color: var(--muted); font-size: 14px; }
+        .val { color: #fff; font-size: 14px; font-weight: 600; }
+        .hint { margin-top: 18px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+        .hint code { color: var(--primary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <span class="badge">Offline Mock Target</span>
+        <h1>Network Interception & API Mocking</h1>
+        <p class="subtitle">Practice intercepting network routes with `page.route()` to modify response bodies and test edge cases.</p>
+
+        <div class="card">
+            <button class="btn" id="fetchUserBtn" onclick="fetchUserProfile()">Fetch User Profile</button>
+
+            <div class="profile-card">
+                <div class="row">
+                    <span class="label">Name:</span>
+                    <span class="val" id="userName">--</span>
+                </div>
+                <div class="row">
+                    <span class="label">Role:</span>
+                    <span class="val" id="userRole">--</span>
+                </div>
+                <div class="row">
+                    <span class="label">Department:</span>
+                    <span class="val" id="userDept">--</span>
+                </div>
+                <div class="row">
+                    <span class="label">Status:</span>
+                    <span class="val" id="userStatus" style="color:var(--success)">--</span>
+                </div>
+            </div>
+
+            <div class="hint">
+                💡 By default, clicking the button calls <code>/api/user-profile</code>. Intercept this URL in Playwright to simulate different user roles or error codes!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchUserProfile() {
+            const btn = document.getElementById("fetchUserBtn");
+            btn.disabled = true;
+            btn.innerText = "Fetching...";
+
+            try {
+                const res = await fetch("/api/user-profile");
+                const data = await res.json();
+                document.getElementById("userName").innerText = data.name || "Default User";
+                document.getElementById("userRole").innerText = data.role || "Standard Tester";
+                document.getElementById("userDept").innerText = data.department || "Engineering";
+                document.getElementById("userStatus").innerText = data.status || "Active";
+            } catch (e) {
+                document.getElementById("userName").innerText = "Error Loading Profile";
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Fetch User Profile";
+            }
+        }
+    </script>
+</body>
+</html>

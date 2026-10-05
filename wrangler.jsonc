@@ -1,0 +1,47 @@
+// Cloudflare Containers + Worker configuration.
+//
+// This file lives at the REPOSITORY ROOT on purpose: with the default scheduling
+// policy, Wrangler builds ./Dockerfile locally with Docker using the directory
+// that contains this config as the build context. Keeping it next to the
+// Dockerfile means `COPY requirements.txt ./` and `COPY . .` resolve correctly.
+//
+// Deploy (Docker Desktop must be running - Wrangler builds the image locally):
+//   cd cloudflare && npm install
+//   npx wrangler deploy --config ../wrangler.jsonc
+//
+// Before exposing it publicly, set the access gate:
+//   npx wrangler secret put STUDIO_ACCESS_PASSWORD --config ../wrangler.jsonc
+
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "playwright-practice-studio",
+  "main": "cloudflare/src/index.ts",
+  "compatibility_date": "2026-10-01",
+
+  "containers": [
+    {
+      "class_name": "StudioContainer",
+      "image": "./Dockerfile",
+      // lite (256 MiB) and basic (1 GiB) are too small for headless Chromium.
+      // standard-1 = 1/2 vCPU, 4 GiB memory, 8 GB disk.
+      "instance_type": "standard-1",
+      // One instance: the Studio keeps run history in SQLite and tracks the
+      // Stop button's child processes in memory, so it must not be sharded.
+      "max_instances": 1
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [{ "class_name": "StudioContainer", "name": "STUDIO_CONTAINER" }]
+  },
+
+  "migrations": [{ "new_sqlite_classes": ["StudioContainer"], "tag": "v1" }],
+
+  "observability": { "enabled": true },
+
+  "vars": {
+    // Change to your own origin before sharing the URL, e.g.
+    // "STUDIO_ALLOWED_ORIGINS": "https://studio.example.com"
+    "STUDIO_ALLOWED_ORIGINS": "*"
+  }
+}

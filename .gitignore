@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Local runtime database (recreated automatically on startup)
+app/history.db
+
+# Node
+node_modules/
+
+# Playwright Test artifacts
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Cloudflare (Workers/Containers)
+# `wrangler --outdir` resolves relative to the config file, which lives at the
+# repo root, so build output lands here rather than in a subdirectory.
+.wrangler/
+dist/
+.dev.vars
+
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { background: #0b1120; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 16px; margin: 0; }
+        input { background: #1e293b; border: 1px solid #334155; color: #fff; padding: 8px 12px; border-radius: 4px; width: 220px; outline: none; margin-right: 8px; font-size: 13px; }
+        button { background: #38bdf8; color: #0f172a; border: none; padding: 8px 14px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px; }
+        #frameResult { margin-top: 10px; color: #22c55e; font-size: 13px; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <h3 style="margin-bottom: 8px; font-size: 14px; color: #94a3b8;">Inside iFrame Document</h3>
+    <input type="text" id="frameInput" placeholder="Type inside iframe..." />
+    <button id="frameSubmit">Submit Frame Form</button>
+    <div id="frameResult"></div>
+
+    <script>
+        document.getElementById("frameSubmit").addEventListener("click", function () {
+            var val = document.getElementById("frameInput").value;
+            document.getElementById("frameResult").innerText = "Received: " + val;
+        });
+    </script>
+</body>
+</html>

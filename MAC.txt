@@ -1,0 +1,3 @@
+chmod +x setup_mac.sh start_mac.sh
+./setup_mac.sh
+./start_mac.sh
