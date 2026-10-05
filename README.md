@@ -16,7 +16,8 @@ docker compose up --build      # then open http://localhost:8000/login
 ```
 
 **Read [DEPLOYMENT.md](DEPLOYMENT.md) first** — it explains the security implications of
-publishing a code runner, how to gate it, and the per-host steps.
+publishing a code runner, how to gate it, and the per-host steps. For Cloudflare
+(Pages, Tunnel or Containers) see [cloudflare/README.md](cloudflare/README.md).
 
 ---
 

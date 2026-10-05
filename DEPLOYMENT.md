@@ -36,9 +36,33 @@ Python + Node + Chromium in one runtime.
 | Path | What you get | Where | Notes |
 |---|---|---|---|
 | **A. Login page only** | A link to the sign-in UI | GitHub Pages, Netlify, Vercel, Cloudflare Pages | Static only — sign-in needs the API |
-| **B. Full Studio in a container** ✅ | IDE + all runners + playground targets + login API | Render, Railway, Fly.io, Cloud Run, HF Spaces | Files in this repo already support it |
+| **B. Full Studio in a container** ✅ | IDE + all runners + playground targets + login API | Render, Railway, Fly.io, Cloud Run, HF Spaces, **Cloudflare Containers** | Files in this repo already support it |
 | **C. Full Studio on a VPS** | Same, on a box you control | EC2, DigitalOcean, Hetzner, Lightsail | Most control, HTTPS via Caddy/nginx |
 | **D. Temporary tunnel** | Share your local instance for an hour | Cloudflare Tunnel, ngrok | Fastest; still public while open |
+
+### Cloudflare specifically
+
+Cloudflare has its own notes because Workers/Pages **cannot** run this app directly (V8
+isolates: no Python, no Node child processes, no Chromium, 128 MB memory). Three workable
+routes, with full commands in **[cloudflare/README.md](cloudflare/README.md)**:
+
+| Cloudflare product | What it hosts | Verdict |
+|---|---|---|
+| **Cloudflare Pages** | The login page only | Deploys instantly; sign-in reports a network error without the API |
+| **Cloudflare Tunnel** | A tunnel to the Studio on your machine/VPS, with Zero Trust Access in front | ✅ Recommended — free, no container build, runners behave exactly like local |
+| **Cloudflare Containers** | The whole Studio on Cloudflare's edge, proxied by a Worker | ✅ Available (needs Workers Paid + Docker locally to build the image) |
+
+The Containers setup is already committed: `wrangler.jsonc` at the repo root, the Worker
+in `cloudflare/src/` (with an HTTP Basic auth gate so a public URL is not an open code
+runner), and unit tests for that gate.
+
+```bash
+cd cloudflare && npm install
+npx wrangler login
+npx wrangler secret put STUDIO_ACCESS_PASSWORD --config ../wrangler.jsonc
+npx wrangler deploy --config ../wrangler.jsonc        # Docker must be running
+```
+
 
 ---
 

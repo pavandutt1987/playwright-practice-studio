@@ -1,0 +1,32 @@
+# Cloudflare Tunnel config for publishing a LOCALLY running Studio.
+#
+# Start the Studio first (it must be listening on 127.0.0.1:8000):
+#   ./start_web.sh              # or ./start_mac.sh on macOS
+#
+# Then:
+#   cloudflared tunnel create playwright-studio
+#   cloudflared tunnel route dns playwright-studio studio.example.com
+#   cloudflared tunnel --config cloudflare/tunnel-config.yml run playwright-studio
+#
+# Copy this file to ~/.cloudflared/config.yml and adjust the hostname +
+# credentials file, or keep it here and pass --config as above.
+
+tunnel: playwright-studio
+credentials-file: /Users/YOU/.cloudflared/<TUNNEL-ID>.json
+
+ingress:
+  # Your public hostname -> the Studio on your machine.
+  # Keep 127.0.0.1:8000 in sync with start_web.sh (or use another port).
+  - hostname: studio.example.com
+    service: http://127.0.0.1:8000
+    originRequest:
+      # The Studio streams the live console over a WebSocket at /ws/run, and a
+      # single test run can take up to ~60s, so keep these generous.
+      connectTimeout: 30s
+      # Cloudflare Access should be enforced in the dashboard. Once enabled,
+      # cloudflared can validate the Access token for you (Zero Trust ->
+      # Networks -> Tunnels -> your tunnel -> "Protect with Access").
+      noTLSVerify: false
+
+  # Required catch-all: cloudflared refuses to start without a final rule.
+  - service: http_status:404
