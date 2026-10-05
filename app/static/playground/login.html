@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playground - Login Authentication</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --primary: #38bdf8;
+            --primary-hover: #0284c7;
+            --border: #334155;
+            --success: #22c55e;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 100%; max-width: 460px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4); }
+        .badge { display: inline-block; background: rgba(56, 189, 248, 0.1); color: var(--primary); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; margin-bottom: 12px; }
+        h1 { font-size: 22px; margin-bottom: 8px; }
+        p.subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+        .form-group { margin-bottom: 18px; }
+        label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--muted); }
+        input[type="text"], input[type="password"] {
+            width: 100%; background: #0b1120; border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: #fff; font-size: 14px; outline: none; transition: border 0.2s, box-shadow 0.2s;
+        }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12); }
+        input[aria-invalid="true"] { border-color: var(--error); }
+        input:disabled { opacity: 0.6; cursor: not-allowed; }
+        .password-wrapper { position: relative; }
+        .password-wrapper input { padding-right: 74px; }
+        .toggle-password {
+            position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+            background: rgba(148, 163, 184, 0.12); border: 1px solid var(--border); color: var(--muted);
+            font-size: 12px; font-weight: 600; padding: 5px 9px; border-radius: 5px; cursor: pointer;
+        }
+        .toggle-password:hover { color: var(--text); border-color: var(--primary); }
+        .field-error { color: var(--error); font-size: 12px; margin-top: 6px; min-height: 0; }
+        .field-error:empty { display: none; }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+        .checkbox-group input { accent-color: var(--primary); cursor: pointer; width: 15px; height: 15px; }
+        .checkbox-group label { margin-bottom: 0; cursor: pointer; }
+        button.btn {
+            width: 100%; background: var(--primary); color: #0f172a; font-weight: 600; padding: 12px; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: background 0.2s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        button.btn:hover:not(:disabled) { background: var(--primary-hover); }
+        button.btn:disabled { opacity: 0.65; cursor: not-allowed; }
+        .spinner {
+            width: 14px; height: 14px; border: 2px solid rgba(15, 23, 42, 0.35); border-top-color: #0f172a;
+            border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
+        }
+        button.btn.loading .spinner { display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #statusMessage { margin-top: 20px; padding: 12px; border-radius: 6px; font-size: 14px; display: none; text-align: center; line-height: 1.45; }
+        #statusMessage.success { background: rgba(34, 197, 94, 0.15); border: 1px solid var(--success); color: var(--success); display: block; }
+        #statusMessage.error { background: rgba(239, 68, 68, 0.15); border: 1px solid var(--error); color: var(--error); display: block; }
+        #statusMessage.warning { background: rgba(245, 158, 11, 0.15); border: 1px solid var(--warning); color: var(--warning); display: block; }
+        #attemptsCounter { margin-top: 10px; font-size: 12px; color: var(--warning); display: none; text-align: center; }
+        #attemptsCounter.visible { display: block; }
+        .hint-box { margin-top: 24px; padding: 12px; background: rgba(148, 163, 184, 0.05); border: 1px dashed var(--border); border-radius: 6px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+        .hint-box code { color: var(--primary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .hint-box strong { color: var(--text); }
+        .hint-box table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .hint-box th, .hint-box td { text-align: left; padding: 3px 6px 3px 0; font-size: 12px; }
+        .hint-box th { color: var(--text); font-weight: 600; border-bottom: 1px solid var(--border); }
+        details.practice-tips { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 10px; }
+        details.practice-tips summary { cursor: pointer; color: var(--primary); font-weight: 600; }
+        details.practice-tips pre { margin-top: 8px; background: #0b1120; border: 1px solid var(--border); border-radius: 6px; padding: 10px; overflow-x: auto; font-size: 11px; line-height: 1.5; color: #cbd5e1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .top-links { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+        .top-links a { color: var(--muted); font-size: 12px; text-decoration: none; }
+        .top-links a:hover { color: var(--primary); }
+
+        /* --- Signed-in view --- */
+        #welcomeView { display: none; }
+        #welcomeView.active { display: block; }
+        .welcome-banner {
+            background: rgba(34, 197, 94, 0.12); border: 1px solid var(--success); border-radius: 8px;
+            padding: 16px; margin-bottom: 20px; text-align: center;
+        }
+        .welcome-banner .avatar { font-size: 30px; display: block; margin-bottom: 6px; }
+        .welcome-banner h2 { font-size: 18px; margin-bottom: 4px; color: var(--success); }
+        .welcome-banner p { font-size: 13px; color: var(--muted); }
+        .session-details { border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-size: 13px; }
+        .session-details h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+        .session-details dl { display: grid; grid-template-columns: 40% 60%; gap: 6px 10px; }
+        .session-details dt { color: var(--muted); }
+        .session-details dd { color: var(--text); word-break: break-word; }
+        .welcome-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .welcome-actions button, .welcome-actions a {
+            flex: 1; text-align: center; padding: 11px; border-radius: 6px; font-size: 14px; font-weight: 600;
+            text-decoration: none; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text);
+        }
+        .welcome-actions button.logout { border-color: var(--error); color: var(--error); }
+        .welcome-actions button.logout:hover { background: rgba(239, 68, 68, 0.12); }
+        .welcome-actions a.primary { background: var(--primary); border-color: var(--primary); color: #0f172a; }
+        .welcome-actions a.primary:hover { background: var(--primary-hover); }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="top-links">
+            <a href="/" data-testid="back-to-studio">&larr; Back to Studio IDE</a>
+        </div>
+
+        <span class="badge">Offline Mock Target &middot; real API</span>
+
+        <!-- ============================ SIGNED OUT ============================ -->
+        <section id="loginView" data-testid="login-view">
+            <h1>Login Authentication</h1>
+            <p class="subtitle">Practice form filling, accessible locators, session cookies,
+                lockout states, and assertions.</p>
+
+            <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username"
+                           data-testid="username-input" autocomplete="username"
+                           aria-describedby="usernameError" aria-required="true" required />
+                    <p class="field-error" id="usernameError" data-testid="username-error" role="alert"></p>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="password" name="password" placeholder="Enter password"
+                               data-testid="password-input" autocomplete="current-password"
+                               aria-describedby="passwordError" aria-required="true" required />
+                        <button type="button" class="toggle-password" id="togglePassword"
+                                data-testid="toggle-password" aria-pressed="false"
+                                aria-controls="password">Show</button>
+                    </div>
+                    <p class="field-error" id="passwordError" data-testid="password-error" role="alert"></p>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="remember" name="remember" data-testid="remember-checkbox" />
+                    <label for="remember">Remember my session for 7 days</label>
+                </div>
+
+                <button type="submit" class="btn" id="signInBtn" data-testid="login-button">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span id="signInBtnLabel">Sign In</span>
+                </button>
+            </form>
+
+            <div id="statusMessage" data-testid="status-message" role="alert" aria-live="polite"></div>
+            <p id="attemptsCounter" data-testid="attempts-counter" role="status" aria-live="polite"></p>
+
+            <div class="hint-box" data-testid="demo-users">
+                <strong>🔑 Test Credentials</strong>
+                <table>
+                    <tr><th>Username</th><th>Password</th><th>Expected result</th></tr>
+                    <tr><td><code>admin</code></td><td><code>password123</code></td><td>Signs in</td></tr>
+                    <tr><td><code>standard_user</code></td><td><code>secret_sauce</code></td><td>Signs in (read-only role)</td></tr>
+                    <tr><td><code>locked_out_user</code></td><td><code>locked123</code></td><td>403 &mdash; account locked</td></tr>
+                    <tr><td><code>anything_else</code></td><td><code>whatever</code></td><td>401 &mdash; invalid credentials</td></tr>
+                </table>
+                <p style="margin-top:8px;">After <strong>5 failed attempts</strong> in a minute the account gets a
+                    temporary lockout (HTTP <code>429</code> + <code>Retry-After</code>).</p>
+
+                <details class="practice-tips">
+                    <summary>🎯 Playwright practice ideas</summary>
+<pre>page.goto("/login")
+page.getByLabel("Username").fill("admin")
+page.getByLabel("Password").fill("password123")
+page.getByTestId("remember-checkbox").check()
+page.getByRole("button", { name: "Sign In" }).click()
+expect(page.getByTestId("welcome-banner")).to_contain_text("Alex Admin")
+
+# session survives a reload (cookie based)
+page.reload()
+expect(page.getByTestId("welcome-banner")).to_be_visible()
+
+# wrong password -> inline error, HTTP 401
+expect(page.getByTestId("status-message")).to_contain_text("Invalid username or password")</pre>
+                </details>
+            </div>
+        </section>
+
+        <!-- ============================ SIGNED IN ============================ -->
+        <section id="welcomeView" data-testid="welcome-view">
+            <div class="welcome-banner" data-testid="welcome-banner">
+                <span class="avatar" aria-hidden="true">✅</span>
+                <h2 id="welcomeHeading" data-testid="welcome-message">Welcome back!</h2>
+                <p>Session successfully created.</p>
+            </div>
+
+            <div class="session-details">
+                <h3>Session details</h3>
+                <dl>
+                    <dt>Signed in as</dt>
+                    <dd id="sessionUsername" data-testid="session-username">&mdash;</dd>
+                    <dt>Role</dt>
+                    <dd id="sessionRole" data-testid="session-role">&mdash;</dd>
+                    <dt>Cookie</dt>
+                    <dd id="sessionCookie" data-testid="session-cookie">pps_session</dd>
+                    <dt>Remembered</dt>
+                    <dd id="sessionRemembered" data-testid="session-remembered">No</dd>
+                    <dt>Expires</dt>
+                    <dd id="sessionExpires" data-testid="session-expires">&mdash;</dd>
+                </dl>
+            </div>
+
+            <div class="welcome-actions">
+                <button type="button" class="logout" id="logoutBtn" data-testid="logout-button">Sign Out</button>
+                <a class="primary" href="/" data-testid="open-studio">Open Studio IDE</a>
+            </div>
+
+            <div id="logoutMessage" data-testid="logout-message" role="status" aria-live="polite"
+                 style="margin-top:14px;font-size:13px;color:var(--muted);text-align:center;"></div>
+        </section>
+    </div>
+
+    <script>
+        // ---------------------------------------------------------------------
+        // Login Authentication target - talks to the real FastAPI auth API
+        // (see app/auth.py). Everything is plain DOM + fetch so the page stays
+        // framework-free and easy to automate with Playwright.
+        // ---------------------------------------------------------------------
+        const AUTH_API = {
+            login: "/api/auth/login",
+            logout: "/api/auth/logout",
+            me: "/api/auth/me"
+        };
+
+        const el = (id) => document.getElementById(id);
+        const loginView = el("loginView");
+        const welcomeView = el("welcomeView");
+        const form = el("loginForm");
+        const usernameInput = el("username");
+        const passwordInput = el("password");
+        const rememberInput = el("remember");
+        const signInBtn = el("signInBtn");
+        const signInBtnLabel = el("signInBtnLabel");
+        const statusMessage = el("statusMessage");
+        const attemptsCounter = el("attemptsCounter");
+        const logoutMessage = el("logoutMessage");
+
+        let lockoutTimer = null;
+        let lockoutActive = false;   // keeps the button disabled while the countdown runs
+
+        // --- small DOM helpers -------------------------------------------------
+        function setText(node, text) { if (node) node.textContent = text; }
+
+        function showStatus(kind, text, testId) {
+            statusMessage.className = kind;          // "error" | "success" | "warning"
+            setText(statusMessage, text);
+            if (testId) statusMessage.setAttribute("data-state", testId);
+            else statusMessage.removeAttribute("data-state");
+        }
+
+        function clearStatus() {
+            statusMessage.className = "";
+            statusMessage.textContent = "";
+            statusMessage.removeAttribute("data-state");
+            attemptsCounter.classList.remove("visible");
+            attemptsCounter.textContent = "";
+        }
+
+        function setFieldError(field, errorNode, message) {
+            setText(errorNode, message || "");
+            if (message) field.setAttribute("aria-invalid", "true");
+            else field.removeAttribute("aria-invalid");
+        }
+
+        function clearErrors() {
+            setFieldError(usernameInput, el("usernameError"), "");
+            setFieldError(passwordInput, el("passwordError"), "");
+        }
+
+        function setLoading(isLoading) {
+            signInBtn.disabled = isLoading;
+            signInBtn.classList.toggle("loading", isLoading);
+            form.setAttribute("aria-busy", isLoading ? "true" : "false");
+            setText(signInBtnLabel, isLoading ? "Signing in…" : "Sign In");
+        }
+
+        function startLockoutCountdown(seconds) {
+            clearInterval(lockoutTimer);
+            let remaining = Math.max(0, Math.floor(seconds));
+            if (remaining <= 0) return;
+
+            lockoutActive = true;
+            setLoading(true);
+            const tick = () => {
+                if (remaining <= 0) {
+                    clearInterval(lockoutTimer);
+                    lockoutActive = false;
+                    setLoading(false);
+                    showStatus("warning", "You can try signing in again now.");
+                    return;
+                }
+                showStatus("warning", `⏳ Too many failed attempts. Try again in ${remaining}s.`);
+                setText(signInBtnLabel, `Locked (${remaining}s)`);
+                remaining -= 1;
+            };
+            tick();
+            lockoutTimer = setInterval(tick, 1000);
+        }
+
+        // --- views -------------------------------------------------------------
+        function showWelcome(user, session) {
+            loginView.style.display = "none";
+            welcomeView.classList.add("active");
+
+            setText(el("welcomeHeading"), `Welcome back, ${user.display_name}!`);
+            setText(el("sessionUsername"), user.username);
+            setText(el("sessionRole"), user.role);
+            setText(el("sessionCookie"), session.cookie_name || "pps_session");
+            setText(el("sessionRemembered"), session.remember ? "Yes (persistent cookie)" : "No (session cookie)");
+            setText(el("sessionExpires"), session.expires_at
+                ? new Date(session.expires_at).toLocaleString()
+                : "—");
+            setText(logoutMessage, "");
+        }
+
+        function showLoginView() {
+            welcomeView.classList.remove("active");
+            loginView.style.display = "";
+        }
+
+        // --- actions -----------------------------------------------------------
+        async function handleLogin(event) {
+            if (event && event.preventDefault) event.preventDefault();
+            clearErrors();
+            clearStatus();
+
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            let hasClientError = false;
+
+            // 1. Client-side validation - no request is sent when fields are empty
+            if (!username) {
+                setFieldError(usernameInput, el("usernameError"), "Username is required.");
+                hasClientError = true;
+            }
+            if (!password) {
+                setFieldError(passwordInput, el("passwordError"), "Password is required.");
+                hasClientError = true;
+            }
+            if (hasClientError) {
+                showStatus("error", "Please fix the highlighted fields and try again.", "validation");
+                return;
+            }
+
+            // 2. Call the real API
+            setLoading(true);
+            try {
+                const response = await fetch(AUTH_API.login, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "same-origin",
+                    body: JSON.stringify({
+                        username: username,
+                        password: password,
+                        remember: rememberInput.checked
+                    })
+                });
+                const data = await response.json().catch(() => ({}));
+
+                if (response.ok && data.success) {
+                    showStatus("success", data.message || "Signed in successfully.", "success");
+                    showWelcome(data.user, data.session || {});
+                    return;
+                }
+
+                // 3. Map the documented failure statuses onto the UI
+                const message = data.message || "Sign in failed. Please try again.";
+                if (response.status === 429) {
+                    const retryAfter = response.headers.get("Retry-After") || 60;
+                    startLockoutCountdown(retryAfter);
+                } else if (response.status === 401) {
+                    showStatus("error", message, "invalid-credentials");
+                } else if (response.status === 403) {
+                    showStatus("error", message, "account-locked");
+                } else {
+                    showStatus("error", message, "validation");
+                }
+
+                if (typeof data.attempts_remaining === "number" && data.attempts_remaining > 0) {
+                    attemptsCounter.textContent =
+                        `${data.attempts_remaining} of 5 attempts remaining before a temporary lockout.`;
+                    attemptsCounter.classList.add("visible");
+                }
+            } catch (error) {
+                showStatus("error", "Network error: could not reach the login API. Is the studio server running?", "network-error");
+            } finally {
+                // During a rate-limit countdown the button must stay disabled.
+                if (!lockoutActive) setLoading(false);
+            }
+        }
+
+        async function handleLogout() {
+            setText(logoutMessage, "Signing out…");
+            clearInterval(lockoutTimer);
+            lockoutActive = false;
+            try {
+                await fetch(AUTH_API.logout, { method: "POST", credentials: "same-origin" });
+            } catch (error) {
+                // Ignore: the cookie is cleared client-side by the server response anyway.
+            }
+            showLoginView();
+            clearStatus();
+            clearErrors();
+            setLoading(false);
+            passwordInput.value = "";
+            setText(logoutMessage, "");
+            showStatus("success", "You have been signed out.", "signed-out");
+            usernameInput.focus();
+        }
+
+        // Restores an existing session on load (the cookie is the only credential kept)
+        async function restoreSession() {
+            try {
+                const response = await fetch(AUTH_API.me, { credentials: "same-origin" });
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.authenticated) showWelcome(data.user, data.session || {});
+            } catch (error) {
+                // Offline / server not running - stay on the login form silently.
+            }
+        }
+
+        function togglePasswordVisibility() {
+            const button = el("togglePassword");
+            const showing = passwordInput.type === "text";
+            passwordInput.type = showing ? "password" : "text";
+            button.setAttribute("aria-pressed", showing ? "false" : "true");
+            setText(button, showing ? "Show" : "Hide");
+            passwordInput.focus();
+        }
+
+        // --- wiring ------------------------------------------------------------
+        el("togglePassword").addEventListener("click", togglePasswordVisibility);
+        el("logoutBtn").addEventListener("click", handleLogout);
+        document.addEventListener("DOMContentLoaded", restoreSession);
+
+        // Keep the original global so saved practice snippets using
+        // onsubmit="handleLogin(event)" continue to work.
+        window.handleLogin = handleLogin;
+    </script>
+</body>
+</html>

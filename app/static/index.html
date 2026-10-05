@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playwright Practice Studio - Multi-Language IDE</title>
+    <!-- Monaco Editor Loader -->
+    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Top Control Bar -->
+    <header class="top-bar">
+        <div class="top-bar-left">
+            <button id="toggleDrawerBtn" class="icon-btn" title="Toggle History & Practice Targets">
+                <span class="icon">☰</span>
+                <span class="btn-label">History & Targets</span>
+            </button>
+            <div class="brand">
+                <span class="brand-logo">🎭</span>
+                <span class="brand-title">Playwright Practice Studio</span>
+            </div>
+
+            <!-- Language Selector -->
+            <div class="control-group">
+                <label for="languageSelect">Language:</label>
+                <select id="languageSelect" class="styled-select">
+                    <option value="python">Python 🐍</option>
+                    <option value="typescript">TypeScript 🔷</option>
+                    <option value="javascript">JavaScript 🟨</option>
+                </select>
+            </div>
+
+            <!-- Template Selector -->
+            <div class="control-group">
+                <label for="templateSelect">Template:</label>
+                <select id="templateSelect" class="styled-select">
+                    <option value="" disabled selected>Loading templates...</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="top-bar-right">
+            <!-- Headed / Headless Toggle -->
+            <div class="headed-toggle-wrapper">
+                <label class="switch-label">
+                    <input type="checkbox" id="headedToggle" checked />
+                    <span class="switch-slider"></span>
+                    <span id="headedLabel" class="switch-text" style="color:#38bdf8;">👁️ Headed Browser</span>
+                </label>
+            </div>
+
+            <!-- Save Snippet Button -->
+            <button id="saveSnippetBtn" class="btn secondary-btn" title="Save current code snippet">
+                <span>💾</span> Save Snippet
+            </button>
+
+            <!-- Stop Button (hidden by default) -->
+            <button id="stopBtn" class="btn danger-btn" style="display:none;" title="Terminate running script">
+                <span>⏹️</span> Stop
+            </button>
+
+            <!-- Run Button -->
+            <button id="runBtn" class="btn primary-btn" title="Execute Code (Ctrl + Enter)">
+                <span>▶️</span> Run <span class="hotkey">(Ctrl+↵)</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+        <!-- Collapsible Left Drawer -->
+        <aside id="drawer" class="drawer">
+            <div class="drawer-header">
+                <div class="drawer-tabs">
+                    <button class="drawer-tab active" data-tab="snippets">Saved & History</button>
+                    <button class="drawer-tab" data-tab="playground">Mock Targets</button>
+                </div>
+                <button id="closeDrawerBtn" class="close-btn" title="Close Drawer">&times;</button>
+            </div>
+
+            <!-- Tab 1: Snippets & History -->
+            <div id="tabSnippets" class="drawer-content active">
+                <div class="drawer-search-bar">
+                    <input type="text" id="snippetSearchInput" placeholder="Search history & snippets..." />
+                    <select id="snippetLangFilter">
+                        <option value="all">All Languages</option>
+                        <option value="python">Python</option>
+                        <option value="typescript">TypeScript</option>
+                        <option value="javascript">JavaScript</option>
+                    </select>
+                </div>
+
+                <div class="sub-tabs">
+                    <button id="viewSnippetsBtn" class="sub-tab-btn active">⭐ Saved Snippets</button>
+                    <button id="viewHistoryBtn" class="sub-tab-btn">🕒 Execution History</button>
+                </div>
+
+                <div id="snippetsList" class="items-list">
+                    <!-- Dynamic snippet list -->
+                </div>
+                <div id="historyList" class="items-list" style="display:none;">
+                    <!-- Dynamic history list -->
+                </div>
+            </div>
+
+            <!-- Tab 2: Playground Targets -->
+            <div id="tabPlayground" class="drawer-content">
+                <div class="playground-intro">
+                    <p>Built-in offline sandbox targets specifically built for mastering Playwright locators, waits, and assertions:</p>
+                </div>
+                <div class="targets-list">
+                    <div class="target-card" onclick="window.open('/playground/login.html', '_blank')">
+                        <div class="target-icon">🔑</div>
+                        <div class="target-info">
+                            <h4>1. Login Authentication</h4>
+                            <p>Server-validated sign-in, session cookies, lockout &amp; rate-limit states</p>
+                            <span class="target-link">/playground/login.html ↗</span>
+                        </div>
+                    </div>
+
+                    <div class="target-card" onclick="window.open('/playground/dynamic-tables.html', '_blank')">
+                        <div class="target-icon">📊</div>
+                        <div class="target-info">
+                            <h4>2. Dynamic Tables & AJAX</h4>
+                            <p>Row filtering, sorting, and awaiting AJAX response</p>
+                            <span class="target-link">/playground/dynamic-tables.html ↗</span>
+                        </div>
+                    </div>
+
+                    <div class="target-card" onclick="window.open('/playground/iframes-shadowdom.html', '_blank')">
+                        <div class="target-icon">👥</div>
+                        <div class="target-info">
+                            <h4>3. Frames & Shadow DOM</h4>
+                            <p>Frame locator and piercing Open Shadow Root</p>
+                            <span class="target-link">/playground/iframes-shadowdom.html ↗</span>
+                        </div>
+                    </div>
+
+                    <div class="target-card" onclick="window.open('/playground/alerts-popups.html', '_blank')">
+                        <div class="target-icon">🚨</div>
+                        <div class="target-info">
+                            <h4>4. Alerts & Multiple Tabs</h4>
+                            <p>Dialog events (accept/dismiss) & context page capture</p>
+                            <span class="target-link">/playground/alerts-popups.html ↗</span>
+                        </div>
+                    </div>
+
+                    <div class="target-card" onclick="window.open('/playground/file-upload.html', '_blank')">
+                        <div class="target-icon">📁</div>
+                        <div class="target-info">
+                            <h4>5. File Upload Automation</h4>
+                            <p>Setting input files, drag-and-drop file targets</p>
+                            <span class="target-link">/playground/file-upload.html ↗</span>
+                        </div>
+                    </div>
+
+                    <div class="target-card" onclick="window.open('/playground/network-mocking.html', '_blank')">
+                        <div class="target-icon">🌐</div>
+                        <div class="target-info">
+                            <h4>6. Network & API Mocking</h4>
+                            <p>Request routing & intercepting JSON payloads with page.route()</p>
+                            <span class="target-link">/playground/network-mocking.html ↗</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Split View: Editor (Left) & Terminal (Right) -->
+        <div class="split-container">
+            <!-- Left Pane: Editor -->
+            <div class="editor-pane">
+                <div class="pane-header">
+                    <div class="pane-title">
+                        <span id="editorLanguageBadge" class="badge-lang">PYTHON</span>
+                        <span id="editorFilename">test_script.py</span>
+                    </div>
+                    <div class="pane-actions">
+                        <button id="formatCodeBtn" class="action-btn" title="Format Code">✨ Format</button>
+                        <button id="copyCodeBtn" class="action-btn" title="Copy Code">📋 Copy</button>
+                        <button id="resetTemplateBtn" class="action-btn" title="Reset to Template">↺ Reset</button>
+                    </div>
+                </div>
+                <div id="monacoEditor" class="monaco-container"></div>
+            </div>
+
+            <!-- Right Pane: Terminal Output -->
+            <div class="terminal-pane">
+                <div class="pane-header">
+                    <div class="pane-title">
+                        <span class="terminal-icon">📟</span>
+                        <span>Console Output</span>
+                        <span id="executionStatusBadge" class="status-pill idle">IDLE</span>
+                        <span id="timerBadge" class="timer-badge">0.0s</span>
+                    </div>
+                    <div class="pane-actions">
+                        <button id="clearConsoleBtn" class="action-btn" title="Clear Console">🧹 Clear</button>
+                        <button id="copyLogsBtn" class="action-btn" title="Copy Output">📋 Copy</button>
+                    </div>
+                </div>
+                <div id="terminalOutput" class="terminal-output">
+                    <div class="terminal-welcome">
+                        <p class="welcome-heading">🎭 Playwright Practice Studio Ready</p>
+                        <p>1. Select your preferred language (Python, TypeScript, or JavaScript).</p>
+                        <p>2. Choose an interview challenge template or write custom code.</p>
+                        <p>3. Toggle <strong>👁️ Headed</strong> mode to watch the browser execute live on your screen.</p>
+                        <p>4. Press <strong>▶️ Run (Ctrl+Enter)</strong> to start execution.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Save Snippet Modal -->
+    <div id="saveModal" class="modal-backdrop" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>💾 Save Practice Snippet</h3>
+                <button id="closeModalBtn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="snippetTitle">Snippet Title</label>
+                    <input type="text" id="snippetTitle" placeholder="e.g. Login with Storage State" required />
+                </div>
+                <div class="form-group">
+                    <label for="snippetTags">Tags (comma separated)</label>
+                    <input type="text" id="snippetTags" placeholder="e.g. auth, storageState, POM, interview" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelSaveBtn" class="btn secondary-btn">Cancel</button>
+                <button id="confirmSaveBtn" class="btn primary-btn">Save to Library</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar / Footer -->
+    <footer class="status-bar">
+        <div class="status-left">
+            <span class="status-item"><span class="status-dot green"></span> Server: <strong>http://localhost:8000</strong></span>
+            <span class="status-item" id="pythonStatus"><span class="status-dot green"></span> Python 3.14</span>
+            <span class="status-item" id="nodeStatus"><span class="status-dot green"></span> Node & TSX</span>
+            <span class="status-item" id="browserStatus"><span class="status-dot green"></span> Chromium Ready</span>
+        </div>
+        <div class="status-right">
+            <span>Playwright Practice Platform v1.0</span>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
