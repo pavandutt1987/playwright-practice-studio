@@ -39,6 +39,10 @@
 
   "observability": { "enabled": true },
 
+  // No `alias` entry is needed: cloudflare/src/index.ts imports the vendored
+  // container helper by relative path, so the bundle never resolves a bare npm
+  // specifier. See cloudflare/vendor/containers/README.md.
+
   "vars": {
     // Change to your own origin before sharing the URL, e.g.
     // "STUDIO_ALLOWED_ORIGINS": "https://studio.example.com"

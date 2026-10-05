@@ -115,11 +115,33 @@ cloudflare/
 ├── src/index.ts                # Worker: access gate + proxy to the container
 ├── src/access.ts               # HTTP Basic auth gate (dependency-free, unit tested)
 ├── test/access.test.ts         # npm run cf:test
+├── scripts/doctor.mjs          # npm run cf:doctor (preflight diagnosis)
+├── vendor/containers/          # vendored @cloudflare/containers (see its README)
 └── tsconfig.json               # npm run cf:typecheck
 ```
 
-Convenience scripts (run from the repo root): `npm run cf:install`, `cf:test`,
-`cf:typecheck`, `cf:dev`, `cf:deploy`, `cf:deploy:worker`.
+Convenience scripts (run from the repo root): `npm run cf:install`, `cf:doctor`,
+`cf:test`, `cf:typecheck`, `cf:dev`, `cf:deploy`, `cf:deploy:worker`.
+
+### Why `@cloudflare/containers` is vendored
+
+`cloudflare/src/index.ts` imports `@cloudflare/containers`. If the build environment runs
+`wrangler deploy` without having installed `node_modules`, the bundler fails with
+`Could not resolve "@cloudflare/containers"`.
+
+`cloudflare/src/index.ts` therefore imports a checked-in copy with a plain relative path:
+
+```ts
+import { Container, getContainer } from "../vendor/containers/index.js";
+```
+
+The package has **zero dependencies** and its only non-local import is the
+`cloudflare:workers` runtime builtin, so the copy is self-contained. A relative import
+needs no `npm install` and no `alias` entry, so the Worker bundles in any build
+environment — including one where `npm ci` never ran at all. That removes this entire
+class of deploy failure. The npm dependency is still declared (it provides the TypeScript types for
+`npm run cf:typecheck`); see
+[`vendor/containers/README.md`](vendor/containers/README.md) for how to update the copy.
 
 > Why are the Worker dependencies in the **root** package.json and not in
 > `cloudflare/package.json`? Because Workers Builds (git-push deploys) and the GitHub
@@ -322,37 +344,44 @@ npm run cf:doctor
 
 ### "Could not resolve @cloudflare/containers"
 
-This means `node_modules` did not exist at the **repository root** when Wrangler bundled
-the Worker. Confirm it from the build log — the failing run contains this tell:
+**This cannot happen on revisions that import the vendored copy by relative path** — the
+bundle resolves a file inside the repository, so it does not need `node_modules` at all. If you still see it, the
+build is compiling an **older commit** that predates the vendored import. Jump to
+[the section below](#-retry-rebuilds-the-old-commit).
 
-```
-npm warn exec The following package was not found and will be installed: wrangler@4.147.0
-```
+Should it ever reappear on a current revision, the tell is the commit's package count:
 
-Wrangler is a dependency of this repo, so npm should never have to fetch it. That line
-means no root `npm ci` happened (the neighbouring `pip install -r requirements.txt` is a
-red herring — the Python dependencies belong *inside* the container image, where the
-`Dockerfile` installs them).
+| Build log says | Meaning |
+|---|---|
+| `npm ci` → ~51 packages, no `npm warn exec` | current revision, dependencies installed |
+| `added 9 packages` **and** `npm warn exec … wrangler@4.147.0` | pre-fix revision: only the old root deps were installed and nothing provided `@cloudflare/containers` |
 
-**Fix:** set the Workers Builds **build command** to `npm ci`, or run `npm ci` locally
-before `npm run cf:deploy`.
+The neighbouring `pip install -r requirements.txt` line is a red herring in both cases —
+the Python dependencies belong *inside* the container image, where the `Dockerfile`
+installs them.
 
 ### ⚠️ "Retry deployment" rebuilds the OLD commit
 
-If a build failed before a fix was pushed, pressing **Retry** re-runs **the original
-commit**, not your latest one — so the same error comes back and it looks like the fix
-did nothing. This is easy to misread; the build header shows the commit it is using.
+If a build failed **before** the fix was pushed, pressing **Retry** re-runs **the original
+commit**, not your latest one — so the same error comes back and it looks like the fix did
+nothing. This is easy to misread; the build header shows the commit it is using.
 
 Check the failed build's log for the tell-tale package count:
 
 | What the log says | What it means |
 |---|---|
-| `added ~90 packages`, no `npm warn exec` | a current revision — good |
+| `npm ci` adding ~51 packages, no `npm warn exec` | a current revision — good |
 | `added 9 packages` **and** `npm warn exec … wrangler@4.147.0` | a pre-fix revision; the retry re-ran old code |
 
-**Fix:** trigger a *fresh* build rather than a retry — push a new commit to the build
-branch (or use the dashboard's deploy action on the latest revision), then confirm the
-build header shows the newest commit SHA.
+**Fix:** trigger a *fresh* build rather than a retry —
+
+- push any new commit to the build branch (this is the surest way; Workers Builds creates
+  a new build for the new commit), **or**
+- in **Workers & Pages → your Worker → Deployments**, deploy the newest revision rather
+  than retrying the failed one.
+
+Then confirm the build header shows the newest commit SHA, and that its log shows the full
+dependency install (~51 packages) with no `npm warn exec` line.
 
 ### Other failures
 
@@ -415,8 +444,17 @@ page.goto("https://playwright-practice-studio.<subdomain>.workers.dev/login")
   references exist (`actions/checkout@v7`, `actions/setup-node@v7` confirmed via the
   GitHub API), all `${{ }}` expressions balanced, every shell step passes `bash -n`, and
   the three secrets it uses are the ones documented. Its install/test/worker-only
-  commands were executed locally (`npm ci --prefix cloudflare`, `npm test --prefix
-  cloudflare`, `wrangler deploy --containers-rollout=none`).
+  commands were executed locally (`npm ci`, `npm run cf:test`,
+  `wrangler deploy --containers-rollout=none`).
+- **The vendored relative import removes the dependency on `node_modules` entirely**: with
+  the whole `node_modules` directory deleted *and* no `alias` entry in the configuration —
+  the exact condition that failed in Workers Builds — `npx wrangler deploy --dry-run
+  --containers-rollout=none` still bundles the Worker (56.96 KiB) and resolves the root
+  `Dockerfile`.
+- `npm run cf:doctor` behaves correctly in three states: all-pass with dependencies
+  installed; pass-with-warning when `node_modules` is absent (the bundle is fine, only
+  `wrangler` would be fetched by npx); and a hard failure if a bare
+  `@cloudflare/containers` import reappears or the vendored file goes missing.
 
 **Not verified here** (no Docker daemon and no Cloudflare account in this environment)
 

@@ -8,7 +8,11 @@
  *      FastAPI app + Chromium (see ../Dockerfile).
  */
 
-import { Container, getContainer } from "@cloudflare/containers";
+// Imported with a plain relative path to the vendored copy rather than the bare
+// specifier "@cloudflare/containers". A relative path needs no npm install and no
+// `alias` entry, so the Worker bundles in any build environment - including one
+// where `npm ci` never ran. See ../vendor/containers/README.md.
+import { Container, getContainer } from "../vendor/containers/index.js";
 import { checkAccess } from "./access";
 
 export class StudioContainer extends Container {
