@@ -311,16 +311,67 @@ Set it in `wrangler.jsonc` → `containers[0].instance_type`.
 7. **The image must be `linux/amd64`.** `wrangler deploy` handles this; if you build
    manually on Apple Silicon, pass `--platform linux/amd64`.
 
-### Troubleshooting
+## Diagnosing a failed deploy
+
+Start with the preflight check — it prints a plain-English reason where the bundler
+only says `Could not resolve "@cloudflare/containers"`:
+
+```bash
+npm run cf:doctor
+```
+
+### "Could not resolve @cloudflare/containers"
+
+This means `node_modules` did not exist at the **repository root** when Wrangler bundled
+the Worker. Confirm it from the build log — the failing run contains this tell:
+
+```
+npm warn exec The following package was not found and will be installed: wrangler@4.147.0
+```
+
+Wrangler is a dependency of this repo, so npm should never have to fetch it. That line
+means no root `npm ci` happened (the neighbouring `pip install -r requirements.txt` is a
+red herring — the Python dependencies belong *inside* the container image, where the
+`Dockerfile` installs them).
+
+**Fix:** set the Workers Builds **build command** to `npm ci`, or run `npm ci` locally
+before `npm run cf:deploy`.
+
+### ⚠️ "Retry deployment" rebuilds the OLD commit
+
+If a build failed before a fix was pushed, pressing **Retry** re-runs **the original
+commit**, not your latest one — so the same error comes back and it looks like the fix
+did nothing. This is easy to misread; the build header shows the commit it is using.
+
+Check the failed build's log for the tell-tale package count:
+
+| What the log says | What it means |
+|---|---|
+| `added ~90 packages`, no `npm warn exec` | a current revision — good |
+| `added 9 packages` **and** `npm warn exec … wrangler@4.147.0` | a pre-fix revision; the retry re-ran old code |
+
+**Fix:** trigger a *fresh* build rather than a retry — push a new commit to the build
+branch (or use the dashboard's deploy action on the latest revision), then confirm the
+build header shows the newest commit SHA.
+
+### Other failures
 
 | Symptom | Cause and fix |
 |---|---|
 | `The Docker CLI is needed to build the configured image` | No Docker daemon. Start Docker Desktop, or deploy via GitHub Actions / Workers Builds instead (both have Docker), or use `npm run cf:deploy:worker` to ship Worker-only changes |
 | Deploy succeeds but `/login` returns an error | The container image is still provisioning after the first deploy — wait a few minutes |
-| `Could not resolve "@cloudflare/containers"` | `node_modules` was never installed at the build root. Set the Workers Builds **build command** to `npm ci` (not `pip install -r requirements.txt`), or run `npm ci` locally before `npm run cf:deploy` |
-| `npm warn exec The following package was not found and will be installed: wrangler@…` | Same root cause: no local `wrangler`. It still works via npx, but it means `npm ci` did not run at the build root |
 | Runs fail with a Chromium crash inside the container | Small `/dev/shm`; add `--disable-dev-shm-usage` to the launch args in the practice script |
 | Image push is denied with a permission error | Widen the API token, adding the permission named in the error, then re-run |
+
+### How to read a successful build
+
+1. The build header shows the newest commit.
+2. `npm ci` reports the full dependency set (~90 packages) and no
+   `npm warn exec … wrangler@…`.
+3. `npm run cf:doctor` — all four checks pass.
+4. `wrangler deploy` uploads the Worker and then builds/pushes the image (slow first
+   time: Node + Chromium).
+5. The Worker URL responds after the container has provisioned (allow a few minutes).
 
 ---
 

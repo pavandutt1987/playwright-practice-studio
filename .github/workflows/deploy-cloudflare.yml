@@ -91,6 +91,11 @@ jobs:
       - name: Test the edge access gate
         run: npm run cf:test
 
+      - name: Preflight check (deps, wrangler, config)
+        # Catches the "Could not resolve @cloudflare/containers" class of failure
+        # with a readable message instead of a bundler error.
+        run: npm run cf:doctor
+
       - name: Push the access-gate password to the Worker
         env:
           STUDIO_ACCESS_PASSWORD: ${{ secrets.STUDIO_ACCESS_PASSWORD }}
