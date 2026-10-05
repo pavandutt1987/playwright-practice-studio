@@ -80,18 +80,18 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: cloudflare/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install Worker dependencies
-        # Installed inside cloudflare/ because that is where src/index.ts imports
-        # @cloudflare/containers from. --prefix keeps it working from the repo root.
-        run: npm ci --prefix cloudflare
+        # The Worker's deps (@cloudflare/containers, wrangler) live in the ROOT
+        # package.json so that Workers Builds - which runs at the repo root - can
+        # resolve cloudflare/src/index.ts without a nested install.
+        run: npm ci
 
       - name: Test the edge access gate
-        run: npm test --prefix cloudflare
+        run: npm run cf:test
 
       - name: Push the access-gate password to the Worker
-        working-directory: cloudflare
         env:
           STUDIO_ACCESS_PASSWORD: ${{ secrets.STUDIO_ACCESS_PASSWORD }}
         run: |
@@ -100,16 +100,15 @@ jobs:
             exit 0
           fi
           printf '%s' "$STUDIO_ACCESS_PASSWORD" \
-            | npx wrangler secret put STUDIO_ACCESS_PASSWORD --config ../wrangler.jsonc
+            | npx wrangler secret put STUDIO_ACCESS_PASSWORD --config wrangler.jsonc
 
       - name: Deploy Worker and container
-        working-directory: cloudflare
         run: |
           if [ "${{ inputs.rollout }}" = "worker-only" ]; then
             echo "Worker-only deploy: container image and instances are left untouched."
-            npx wrangler deploy --config ../wrangler.jsonc --containers-rollout=none
+            npx wrangler deploy --config wrangler.jsonc --containers-rollout=none
           else
-            npx wrangler deploy --config ../wrangler.jsonc
+            npx wrangler deploy --config wrangler.jsonc
           fi
 
       - name: Summary

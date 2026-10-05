@@ -61,8 +61,10 @@ included GitHub Actions workflow (runner has Docker; also fires on push to `main
 Cloudflare's own Workers Builds on git push (no Docker anywhere):
 
 ```bash
-# local
-npm run cf:deploy                 # Docker must be running
+# local (Docker must be running)
+npm run cf:install                # npm ci at the repo root - see note below
+npm run cf:test                   # access-gate unit tests
+npm run cf:deploy
 
 # GitHub Actions
 gh secret set CLOUDFLARE_API_TOKEN
@@ -70,6 +72,13 @@ gh secret set CLOUDFLARE_ACCOUNT_ID
 gh secret set STUDIO_ACCESS_PASSWORD
 gh workflow run deploy-cloudflare.yml
 ```
+
+> The Worker's npm dependencies (`@cloudflare/containers`, `wrangler`) live in the **root**
+> `package.json` so that Workers Builds and CI — both of which run at the repository root —
+> can bundle `cloudflare/src/`. If you use Cloudflare's Workers Builds, set the build
+> command to `npm ci`, **not** `pip install -r requirements.txt`: the Python dependencies
+> are installed inside the container image by the `Dockerfile`. Skipping the npm install
+> causes `Could not resolve "@cloudflare/containers"`.
 
 Full steps, including the Workers Builds settings, are in
 [cloudflare/README.md](cloudflare/README.md#-triggering-a-deploy).

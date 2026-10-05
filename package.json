@@ -5,19 +5,23 @@
   "main": "index.js",
   "scripts": {
     "start": "python -m uvicorn app.server:app --host 127.0.0.1 --port 8000 --reload",
-    "cf:install": "npm ci --prefix cloudflare",
-    "cf:test": "npm test --prefix cloudflare",
-    "cf:dev": "cd cloudflare && npx wrangler dev --config ../wrangler.jsonc",
-    "cf:deploy": "npm ci --prefix cloudflare && cd cloudflare && npx wrangler deploy --config ../wrangler.jsonc",
-    "cf:deploy:worker": "npm ci --prefix cloudflare && cd cloudflare && npx wrangler deploy --config ../wrangler.jsonc --containers-rollout=none"
+    "cf:install": "npm ci",
+    "cf:test": "node --experimental-strip-types cloudflare/test/access.test.ts",
+    "cf:typecheck": "tsc --noEmit -p cloudflare",
+    "cf:dev": "wrangler dev --config wrangler.jsonc",
+    "cf:deploy": "wrangler deploy --config wrangler.jsonc",
+    "cf:deploy:worker": "wrangler deploy --config wrangler.jsonc --containers-rollout=none"
   },
   "dependencies": {
+    "@cloudflare/containers": "^0.3.7",
     "@playwright/test": "^1.63.0",
     "playwright": "^1.42.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261005.1",
     "@types/node": "^20.11.0",
     "tsx": "^4.7.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "wrangler": "^4.147.0"
   }
 }

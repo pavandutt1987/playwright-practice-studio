@@ -107,17 +107,25 @@ proxied by the Worker in `cloudflare/src/`.
 ```
 wrangler.jsonc                  # at the REPO ROOT on purpose: the Docker build context
                                 # is the directory containing the config
-.dev.vars.example               # also at the root: Wrangler reads .dev.vars beside the config
+package.json                    # ALSO at the root: the Worker's deps (so Workers Builds,
+                                # which runs at the root, can bundle cloudflare/src/)
+.dev.vars.example               # reads .dev.vars beside wrangler.jsonc
 .github/workflows/deploy-cloudflare.yml   # trigger a deploy from GitHub (Actions tab)
 cloudflare/
 ├── src/index.ts                # Worker: access gate + proxy to the container
 ├── src/access.ts               # HTTP Basic auth gate (dependency-free, unit tested)
-├── test/access.test.ts         # npm test
-└── package.json                # wrangler + @cloudflare/containers
+├── test/access.test.ts         # npm run cf:test
+└── tsconfig.json               # npm run cf:typecheck
 ```
 
 Convenience scripts (run from the repo root): `npm run cf:install`, `cf:test`,
-`cf:deploy`, `cf:deploy:worker`, `cf:dev`.
+`cf:typecheck`, `cf:dev`, `cf:deploy`, `cf:deploy:worker`.
+
+> Why are the Worker dependencies in the **root** package.json and not in
+> `cloudflare/package.json`? Because Workers Builds (git-push deploys) and the GitHub
+> Actions workflow both run at the repository root — if `@cloudflare/containers` were
+> installed in a nested folder, the bundler would fail with
+> `Could not resolve "@cloudflare/containers"`.
 
 ### Deploy
 
@@ -148,11 +156,12 @@ third for anything regular.
 | **GitHub Actions** (workflow included) | Actions → *Deploy to Cloudflare* → **Run workflow**, or `gh workflow run deploy-cloudflare.yml`; also fires on every push to `main` | ❌ No — GitHub's runner has Docker |
 | **Cloudflare Workers Builds** | Dashboard → Workers & Pages → *playwright-practice-studio* → Settings → **Builds** → connect the repo | ❌ No — Cloudflare builds the Dockerfile in its own build environment |
 
-Manual, while iterating:
+Local, while iterating:
 
 ```bash
-npm run cf:install          # npm ci inside cloudflare/ (Worker deps)
+npm run cf:install          # npm ci at the repo root (Worker deps + wrangler)
 npm run cf:test             # the access-gate unit tests, as a pre-deploy check
+npm run cf:typecheck        # tsc --noEmit for the Worker code
 npm run cf:deploy           # full deploy: build image, push, roll out the container
 npm run cf:deploy:worker    # Worker-only: skips the image, keeps existing containers
 ```
@@ -212,8 +221,23 @@ Builds**, connect the GitHub repo, set the production branch to `main`, then:
 | Setting | Value | Why |
 |---|---|---|
 | Root directory | repository root (default) | `wrangler.jsonc` and the `Dockerfile` both live there |
-| Build command | `npm run cf:install` | `src/index.ts` imports `@cloudflare/containers`, which is installed in `cloudflare/` — the root `npm ci` alone would not resolve it |
+| Build command | `npm ci` (or `npm run cf:install`) | ⚠️ **Not** `pip install -r requirements.txt` — see below. This is what installs `@cloudflare/containers`, without which the bundle fails |
 | Deploy command | `npx wrangler deploy` | picks up `wrangler.jsonc` at the root and builds/pushes the image |
+
+**Do not point the build command at `requirements.txt`.** It is a tempting choice because
+the repo has one, but the Python dependencies belong *inside the container image* — the
+`Dockerfile` installs them itself when the image is built. Installing them in the build
+environment is wasted work and, worse, it leaves `node_modules` missing, which produces:
+
+```
+✘ [ERROR] Could not resolve "@cloudflare/containers"
+      cloudflare/src/index.ts:11:40:
+```
+
+If your build log shows a pip install followed by that error, set the build command to
+`npm ci`. The log will then show the deploy command using the locally installed
+`wrangler` instead of `npm warn exec The following package was not found and will be
+installed: wrangler@…`.
 
 Push to `main` and the build runs. Notes from Cloudflare's docs:
 
@@ -293,7 +317,8 @@ Set it in `wrangler.jsonc` → `containers[0].instance_type`.
 |---|---|
 | `The Docker CLI is needed to build the configured image` | No Docker daemon. Start Docker Desktop, or deploy via GitHub Actions / Workers Builds instead (both have Docker), or use `npm run cf:deploy:worker` to ship Worker-only changes |
 | Deploy succeeds but `/login` returns an error | The container image is still provisioning after the first deploy — wait a few minutes |
-| `Could not resolve "@cloudflare/containers"` in a Workers Builds run | The build command did not install `cloudflare/` dependencies — set it to `npm run cf:install` |
+| `Could not resolve "@cloudflare/containers"` | `node_modules` was never installed at the build root. Set the Workers Builds **build command** to `npm ci` (not `pip install -r requirements.txt`), or run `npm ci` locally before `npm run cf:deploy` |
+| `npm warn exec The following package was not found and will be installed: wrangler@…` | Same root cause: no local `wrangler`. It still works via npx, but it means `npm ci` did not run at the build root |
 | Runs fail with a Chromium crash inside the container | Small `/dev/shm`; add `--disable-dev-shm-usage` to the launch args in the practice script |
 | Image push is denied with a permission error | Widen the API token, adding the permission named in the error, then re-run |
 

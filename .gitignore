@@ -19,11 +19,9 @@ blob-report/
 
 # Cloudflare (Workers/Containers)
 # `wrangler --outdir` resolves relative to the config file, which lives at the
-# repo root, so build output lands here rather than in cloudflare/.
+# repo root, so build output lands here rather than in a subdirectory.
 .wrangler/
 dist/
-cloudflare/dist/
-cloudflare/node_modules/
 .dev.vars
 
 
