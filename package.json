@@ -4,7 +4,12 @@
   "description": "Multi-language Playwright test & automation practice platform",
   "main": "index.js",
   "scripts": {
-    "start": "python -m uvicorn app.server:app --host 127.0.0.1 --port 8000 --reload"
+    "start": "python -m uvicorn app.server:app --host 127.0.0.1 --port 8000 --reload",
+    "cf:install": "npm ci --prefix cloudflare",
+    "cf:test": "npm test --prefix cloudflare",
+    "cf:dev": "cd cloudflare && npx wrangler dev --config ../wrangler.jsonc",
+    "cf:deploy": "npm ci --prefix cloudflare && cd cloudflare && npx wrangler deploy --config ../wrangler.jsonc",
+    "cf:deploy:worker": "npm ci --prefix cloudflare && cd cloudflare && npx wrangler deploy --config ../wrangler.jsonc --containers-rollout=none"
   },
   "dependencies": {
     "@playwright/test": "^1.63.0",

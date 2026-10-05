@@ -56,12 +56,23 @@ The Containers setup is already committed: `wrangler.jsonc` at the repo root, th
 in `cloudflare/src/` (with an HTTP Basic auth gate so a public URL is not an open code
 runner), and unit tests for that gate.
 
+Three ways to trigger that deploy — a local `wrangler deploy` (needs Docker), the
+included GitHub Actions workflow (runner has Docker; also fires on push to `main`), or
+Cloudflare's own Workers Builds on git push (no Docker anywhere):
+
 ```bash
-cd cloudflare && npm install
-npx wrangler login
-npx wrangler secret put STUDIO_ACCESS_PASSWORD --config ../wrangler.jsonc
-npx wrangler deploy --config ../wrangler.jsonc        # Docker must be running
+# local
+npm run cf:deploy                 # Docker must be running
+
+# GitHub Actions
+gh secret set CLOUDFLARE_API_TOKEN
+gh secret set CLOUDFLARE_ACCOUNT_ID
+gh secret set STUDIO_ACCESS_PASSWORD
+gh workflow run deploy-cloudflare.yml
 ```
+
+Full steps, including the Workers Builds settings, are in
+[cloudflare/README.md](cloudflare/README.md#-triggering-a-deploy).
 
 
 ---

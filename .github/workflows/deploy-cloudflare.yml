@@ -1,0 +1,131 @@
+# Deploy Playwright Practice Studio to Cloudflare (Worker + Container).
+#
+# Two ways to trigger a run:
+#   1. GitHub UI: Actions -> "Deploy to Cloudflare" -> Run workflow (or `gh workflow run`)
+#   2. Automatically on every push to `main`
+#
+# Why GitHub Actions and not a local `wrangler deploy`? The container image has to
+# be built with Docker and pushed to Cloudflare's registry. GitHub's runners ship
+# with Docker, so CI can build it even if your machine has no Docker installed.
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN       API token from the "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID      from `npx wrangler whoami`, or the dashboard URL
+#   STUDIO_ACCESS_PASSWORD     the password that gates the deployed Studio
+#                              (strongly recommended: without it the URL is an open
+#                              code-execution service. The run warns loudly if unset.)
+#
+# Also needed once, outside CI: a Workers Paid plan ($5/mo) - Containers are not
+# available on the free plan.
+
+name: Deploy to Cloudflare
+
+on:
+  # Manual trigger: the "Run workflow" button in the Actions tab.
+  workflow_dispatch:
+    inputs:
+      rollout:
+        description: "Container rollout"
+        type: choice
+        options:
+          - full
+          - worker-only
+        default: full
+
+  # Automatic trigger. The container image bakes in app/, so any push here needs a
+  # new image, not just new Worker code.
+  push:
+    branches: [main]
+
+# Never run two deploys at once, and never cancel one that is already rolling out.
+concurrency:
+  group: cloudflare-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build image and deploy
+    runs-on: ubuntu-latest
+    # The first build installs Node + Chromium and compiles the image; later runs
+    # reuse Docker layer cache and take a few minutes.
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      - name: Check the Cloudflare credentials are configured
+        run: |
+          missing=""
+          [ -z "$CLOUDFLARE_API_TOKEN" ] && missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):$missing. Add them under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "Credentials present."
+
+      - name: Check Docker is available
+        # Wrangler builds the container image locally, so a deploy without Docker
+        # fails late and confusingly. Fail fast instead.
+        run: docker --version
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cloudflare/package-lock.json
+
+      - name: Install Worker dependencies
+        # Installed inside cloudflare/ because that is where src/index.ts imports
+        # @cloudflare/containers from. --prefix keeps it working from the repo root.
+        run: npm ci --prefix cloudflare
+
+      - name: Test the edge access gate
+        run: npm test --prefix cloudflare
+
+      - name: Push the access-gate password to the Worker
+        working-directory: cloudflare
+        env:
+          STUDIO_ACCESS_PASSWORD: ${{ secrets.STUDIO_ACCESS_PASSWORD }}
+        run: |
+          if [ -z "$STUDIO_ACCESS_PASSWORD" ]; then
+            echo "::warning::STUDIO_ACCESS_PASSWORD is not set - the deployed Studio will have NO access gate, and anyone with the URL can run code on it."
+            exit 0
+          fi
+          printf '%s' "$STUDIO_ACCESS_PASSWORD" \
+            | npx wrangler secret put STUDIO_ACCESS_PASSWORD --config ../wrangler.jsonc
+
+      - name: Deploy Worker and container
+        working-directory: cloudflare
+        run: |
+          if [ "${{ inputs.rollout }}" = "worker-only" ]; then
+            echo "Worker-only deploy: container image and instances are left untouched."
+            npx wrangler deploy --config ../wrangler.jsonc --containers-rollout=none
+          else
+            npx wrangler deploy --config ../wrangler.jsonc
+          fi
+
+      - name: Summary
+        if: success()
+        run: |
+          {
+            echo "### 🎭 Playwright Practice Studio deployed"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Trigger | \`${{ github.event_name }}\` on \`${{ github.ref_name }}\` |"
+            echo "| Rollout | \`${{ inputs.rollout || 'full' }}\` |"
+            echo "| Access gate | $([ -n "$STUDIO_ACCESS_PASSWORD" ] && echo 'enabled' || echo '**DISABLED**') |"
+            echo ""
+            echo "Open \`https://playwright-practice-studio.<your-subdomain>.workers.dev/login\`"
+            echo "(the exact URL is in the deploy log above)."
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          STUDIO_ACCESS_PASSWORD: ${{ secrets.STUDIO_ACCESS_PASSWORD }}

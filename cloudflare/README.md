@@ -108,12 +108,16 @@ proxied by the Worker in `cloudflare/src/`.
 wrangler.jsonc                  # at the REPO ROOT on purpose: the Docker build context
                                 # is the directory containing the config
 .dev.vars.example               # also at the root: Wrangler reads .dev.vars beside the config
+.github/workflows/deploy-cloudflare.yml   # trigger a deploy from GitHub (Actions tab)
 cloudflare/
 ├── src/index.ts                # Worker: access gate + proxy to the container
 ├── src/access.ts               # HTTP Basic auth gate (dependency-free, unit tested)
 ├── test/access.test.ts         # npm test
 └── package.json                # wrangler + @cloudflare/containers
 ```
+
+Convenience scripts (run from the repo root): `npm run cf:install`, `cf:test`,
+`cf:deploy`, `cf:deploy:worker`, `cf:dev`.
 
 ### Deploy
 
@@ -131,8 +135,106 @@ npx wrangler deploy --config ../wrangler.jsonc
 Then open `https://playwright-practice-studio.<your-subdomain>.workers.dev/login` and
 sign in to the browser prompt with the password above (username can be anything).
 
-### Deploying the Worker without rebuilding the container
+---
 
+## 🚀 Triggering a deploy
+
+Three ways to kick off a deployment. Use the first one while iterating, the second or
+third for anything regular.
+
+| Trigger | How | Needs Docker on *your* machine? |
+|---|---|---|
+| **Manual, from your machine** | `npm run cf:deploy` (or `npx wrangler deploy --config ../wrangler.jsonc` inside `cloudflare/`) | ✅ Yes — Wrangler builds the image locally |
+| **GitHub Actions** (workflow included) | Actions → *Deploy to Cloudflare* → **Run workflow**, or `gh workflow run deploy-cloudflare.yml`; also fires on every push to `main` | ❌ No — GitHub's runner has Docker |
+| **Cloudflare Workers Builds** | Dashboard → Workers & Pages → *playwright-practice-studio* → Settings → **Builds** → connect the repo | ❌ No — Cloudflare builds the Dockerfile in its own build environment |
+
+Manual, while iterating:
+
+```bash
+npm run cf:install          # npm ci inside cloudflare/ (Worker deps)
+npm run cf:test             # the access-gate unit tests, as a pre-deploy check
+npm run cf:deploy           # full deploy: build image, push, roll out the container
+npm run cf:deploy:worker    # Worker-only: skips the image, keeps existing containers
+```
+
+### Trigger 2 — GitHub Actions (recommended)
+
+The workflow is at [`.github/workflows/deploy-cloudflare.yml`](../.github/workflows/deploy-cloudflare.yml).
+
+**1. Create an API token.** Cloudflare dashboard → *My Profile* → **API Tokens** →
+*Create Token* → use the **"Edit Cloudflare Workers"** template. Copy the token.
+If the deploy later fails while *pushing the image* with a permission error, edit the
+token and add the permission the error names (the registry is R2-backed), then re-run.
+
+**2. Find your account ID.** `npx wrangler whoami`, or the dashboard URL
+(`dash.cloudflare.com/<account-id>/...`).
+
+**3. Add three repository secrets** (Settings → Secrets and variables → Actions →
+New repository secret), or with the CLI:
+
+```bash
+gh secret set CLOUDFLARE_API_TOKEN        # paste the token
+gh secret set CLOUDFLARE_ACCOUNT_ID       # paste the account ID
+gh secret set STUDIO_ACCESS_PASSWORD      # the password that gates your Studio
+```
+
+**4. Trigger it:**
+
+```bash
+gh workflow run deploy-cloudflare.yml                     # full rollout
+gh workflow run deploy-cloudflare.yml -f rollout=worker-only
+gh run watch                                              # follow the run
+```
+
+Or click **Run workflow** in the Actions tab.
+
+> **The workflow must be on the default branch (`main`) before either trigger works.**
+> GitHub only surfaces `workflow_dispatch` (the Run workflow button and
+> `gh workflow run`) for workflows present on the default branch, and the `push`
+> trigger is scoped to `main` anyway. So merge this branch first — until then the
+> workflow file is inert.
+
+The workflow:
+
+1. fails fast with a clear message if the credentials are missing,
+2. checks Docker is present (the action of last resort for a confusing failure),
+3. installs `cloudflare/` dependencies and runs the access-gate unit tests,
+4. pushes `STUDIO_ACCESS_PASSWORD` as a Worker secret (and **warns loudly** if that
+   secret is unset, because the Studio would then be an open code runner),
+5. deploys, then writes a summary with the rollout mode and gate status.
+
+### Trigger 3 — Cloudflare Workers Builds (deploy on git push)
+
+Cloudflare can build and deploy on your behalf whenever you push — no Docker locally,
+no GitHub secrets. In the dashboard: **Workers & Pages → your Worker → Settings →
+Builds**, connect the GitHub repo, set the production branch to `main`, then:
+
+| Setting | Value | Why |
+|---|---|---|
+| Root directory | repository root (default) | `wrangler.jsonc` and the `Dockerfile` both live there |
+| Build command | `npm run cf:install` | `src/index.ts` imports `@cloudflare/containers`, which is installed in `cloudflare/` — the root `npm ci` alone would not resolve it |
+| Deploy command | `npx wrangler deploy` | picks up `wrangler.jsonc` at the root and builds/pushes the image |
+
+Push to `main` and the build runs. Notes from Cloudflare's docs:
+
+- Dockerfile builds **do** run in the Workers Builds environment, and a production
+  deploy publishes the image and rolls out the container.
+- Builds on **other branches** run `npx wrangler versions upload`: Worker code only —
+  no new image, no container rollout — and no Version URL, because this Worker uses
+  Durable Objects.
+- Set `STUDIO_ACCESS_PASSWORD` as a Worker secret once (`npm run cf:deploy:worker`
+  after `npx wrangler secret put ...`, or the dashboard).
+
+### After the first deploy
+
+The Worker goes live immediately, but the container image still has to provision —
+**wait a few minutes** and reload if the first requests error. A brand-new deploy can
+also take several minutes to build (Node + Chromium is a large image); later runs reuse
+the cached layers.
+
+---
+
+### Deploying the Worker without rebuilding the container
 If you only changed Worker code (`src/*.ts`) and not the Dockerfile:
 
 ```bash
@@ -145,9 +247,11 @@ npx wrangler deploy --config ../wrangler.jsonc --containers-rollout=none
 # From the repo root (Wrangler looks for .dev.vars beside wrangler.jsonc):
 cp .dev.vars.example .dev.vars     # optional local gate
 
+npm run cf:dev                     # wrangler dev: Worker + container on localhost (needs Docker)
+npm run cf:test                    # unit tests for the access gate
+npm run cf:install                 # (re)install the cloudflare/ dependencies
+
 cd cloudflare
-npm run dev                        # wrangler dev: Worker + container on localhost (needs Docker)
-npm test                           # unit tests for the access gate
 npm run typecheck                  # tsc --noEmit
 npx wrangler tail --config ../wrangler.jsonc   # live logs from the deployed Worker
 ```
@@ -164,7 +268,6 @@ npx wrangler tail --config ../wrangler.jsonc   # live logs from the deployed Wor
 Set it in `wrangler.jsonc` → `containers[0].instance_type`.
 
 ### Caveats specific to running the Studio here
-
 1. **Disk is ephemeral.** The container gets a fresh filesystem after every sleep, so
    `history.db` (run history + saved snippets) resets when the instance sleeps
    (`sleepAfter = "10m"` in `src/index.ts`). Set it to `"1h"` or longer to keep state
@@ -183,6 +286,16 @@ Set it in `wrangler.jsonc` → `containers[0].instance_type`.
    and in the process table. Do not scale it out.
 7. **The image must be `linux/amd64`.** `wrangler deploy` handles this; if you build
    manually on Apple Silicon, pass `--platform linux/amd64`.
+
+### Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `The Docker CLI is needed to build the configured image` | No Docker daemon. Start Docker Desktop, or deploy via GitHub Actions / Workers Builds instead (both have Docker), or use `npm run cf:deploy:worker` to ship Worker-only changes |
+| Deploy succeeds but `/login` returns an error | The container image is still provisioning after the first deploy — wait a few minutes |
+| `Could not resolve "@cloudflare/containers"` in a Workers Builds run | The build command did not install `cloudflare/` dependencies — set it to `npm run cf:install` |
+| Runs fail with a Chromium crash inside the container | Small `/dev/shm`; add `--disable-dev-shm-usage` to the launch args in the practice script |
+| Image push is denied with a permission error | Widen the API token, adding the permission named in the error, then re-run |
 
 ---
 
@@ -213,7 +326,8 @@ page.goto("https://playwright-practice-studio.<subdomain>.workers.dev/login")
 **Verified in this repo's environment**
 
 - `npm install` resolves (`wrangler 4.147.0`, `@cloudflare/containers 0.3.7`,
-  `@cloudflare/workers-types 5.20261005.1`, `typescript 5.9.3`).
+  `@cloudflare/workers-types 5.20261005.1`, `typescript 5.9.3`); `npm ci --prefix cloudflare`
+  from the repo root installs cleanly (43 packages, `wrangler` binary present).
 - `npm test` — 9/9 unit tests pass for the access gate (missing/valid/malformed
   credentials, unicode passwords, custom realms).
 - `npm run typecheck` — `tsc --noEmit` passes with no errors.
@@ -221,12 +335,20 @@ page.goto("https://playwright-practice-studio.<subdomain>.workers.dev/login")
   config, bundles the Worker (57 KiB, `@cloudflare/containers` resolved), registers the
   `STUDIO_CONTAINER` Durable Object binding, and resolves the container image to the
   repo-root `Dockerfile`.
+- The workflow in `.github/workflows/deploy-cloudflare.yml` — valid YAML, the two action
+  references exist (`actions/checkout@v7`, `actions/setup-node@v7` confirmed via the
+  GitHub API), all `${{ }}` expressions balanced, every shell step passes `bash -n`, and
+  the three secrets it uses are the ones documented. Its install/test/worker-only
+  commands were executed locally (`npm ci --prefix cloudflare`, `npm test --prefix
+  cloudflare`, `wrangler deploy --containers-rollout=none`).
 
 **Not verified here** (no Docker daemon and no Cloudflare account in this environment)
 
-- `docker build` of the image and the push to Cloudflare's registry — run the deploy
-  once locally; the first build takes several minutes.
+- `docker build` of the image and the push to Cloudflare's registry — GitHub Actions or
+  Workers Builds both have Docker, so run the deploy there if your machine does not.
 - The container actually serving traffic on Cloudflare, and WebSocket streaming through
   the Worker to `/ws/run`.
+- Which API-token permissions a container image push needs. Start with the
+  "Edit Cloudflare Workers" template and widen it if the push is denied.
 - Pages deploy (Path 1) and `cloudflared` tunnel setup (Path 2) — both are standard
   commands but were not executed here.
